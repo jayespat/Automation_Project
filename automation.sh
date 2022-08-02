@@ -83,6 +83,23 @@ cp /tmp/${myname}-httpd-logs-${timestamp}.tar \
 s3://${s3_bucket}/${myname}-httpd-logs-${timestamp}.tar
 #
 #############################################################
+# Book keeping - Log tar file details in inventry.html file #
+#############################################################
+#
+filecheck=$([ -e /var/www/html/inventory.html ] && echo "file exists" || echo "file absent")
+if [[ $filecheck == *"file absent"* ]]; then
+        echo "**Creating new inventory file"
+        echo -e "Log Type\tTime Created\tType\tSize" > /var/www/html/inventory.html
+        filesize=$(wc -c /var/www/html/inventory.html | awk '{print $1}')
+        echo -e "httpd-logs\t$timestamp\t"tar"\t$filesize" >> /var/www/html/inventory.html
+
+else
+        echo "**Updating existing inventory file"
+        filesize=$(wc -c /var/www/html/inventory.html | awk '{print $1}')
+        echo -e "httpd-logs\t$timestamp\t"tar"\t$filesize" >> /var/www/html/inventory.html
+fi
+#
+#############################################################
 # Empty the log files from EC2 instance after copying to    #
 # S3 bucket and also delete the .tar files from /tmp/ to    #
 # save the space.                                           #
@@ -91,6 +108,22 @@ s3://${s3_bucket}/${myname}-httpd-logs-${timestamp}.tar
 truncate -s 0 /var/log/apache2/*.log
 #
 rm -rf /tmp/*.tar
+#
+#############################################################
+# Check if the crontab file is present and the cron job     #
+# is scheduled.                                             #
+#############################################################
+#
+cronchk="/etc/cron.d/automation"
+filecron=$([ -e $cronchk ] && echo "file exists" || echo "file absent")
+if [[ $filecron == *"file absent"* ]]; then
+	echo "**Creating a new crontab file"
+        echo "SHELL=/bin/sh" > $cronchk
+        echo "PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin" >> $cronchk
+        echo "5 * * * * root /root/Automation_Project/automation.sh" >> $cronchk
+else
+        echo "**Crontab file is already present"
+fi
 #
 exit
 #
